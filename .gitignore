@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+lib/
+junit.xml
+coverage/
+.env
+.cache/
+public/
+dist/
+*.log
+.vscode/settings.json
