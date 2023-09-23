@@ -13,7 +13,7 @@
     "email": "farskid@gmail.com",
     "url": "https://farzadyz.com"
   },
-  "version": "0.0.1",
+  "version": "0.0.4",
   "main": "dist/immeroo.cjs.js",
   "module": "dist/immeroo.esm.js",
   "license": "MIT",
@@ -25,16 +25,18 @@
     "@babel/parser": "^7.22.16",
     "@babel/preset-env": "^7.22.20",
     "@babel/preset-typescript": "^7.22.15",
+    "@changesets/cli": "^2.26.2",
     "@preconstruct/cli": "^2.8.1",
     "@types/jest": "^29.5.5",
     "@types/node": "^20.6.3",
     "typescript": "^5.2.2",
-    "vitest": "^0.34.5",
-    "@changesets/cli": "^2.26.2"
+    "vitest": "^0.34.5"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "preconstruct watch",
-    "postinstall": "preconstruct dev",
     "build": "preconstruct build",
     "prepare": "npm run build",
     "prerelease": "npm test",
@@ -42,7 +44,26 @@
     "test": "yarn vitest run"
   },
   "dependencies": {
-    "immer": "^10.0.2",
-    "nanoid": "^5.0.1"
+    "immer": "^10.0.2"
+  },
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/immeroo.cjs.mjs",
+        "default": "./dist/immeroo.cjs.js"
+      },
+      "module": "./dist/immeroo.esm.js",
+      "import": "./dist/immeroo.cjs.mjs",
+      "default": "./dist/immeroo.cjs.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "preconstruct": {
+    "exports": {
+      "importConditionDefaultExport": "default"
+    },
+    "___experimentalFlags_WILL_CHANGE_IN_PATCH": {
+      "importsConditions": true
+    }
   }
 }
