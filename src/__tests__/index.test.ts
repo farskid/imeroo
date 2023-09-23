@@ -205,6 +205,24 @@ describe("Spec", () => {
   });
 });
 
+describe("Config", () => {
+  it("Should work with consumer state including maps and sets", () => {
+    let state = { nums: new Set(), chars: new Map() };
+    const undoRedo = new UndoRedoSystem<typeof state>({ mapSet: true });
+    undoRedo.update(state, (draft) => {
+      draft.nums.add(1);
+      draft.chars.set("a", 1);
+    });
+
+    expect(state).toMatchInlineSnapshot(`
+      {
+        "chars": Map {},
+        "nums": Set {},
+      }
+    `);
+  });
+});
+
 describe("Appending", () => {
   it("Should support appending to the last update", () => {
     const input = new Input();

@@ -5,6 +5,7 @@ import {
   applyPatches,
   Objectish,
   produce,
+  enableMapSet,
 } from "immer";
 import {
   immerToTransactionPatches,
@@ -12,8 +13,6 @@ import {
   uniqueTransactionId,
 } from "./utils";
 export type { Patch } from "immer";
-
-enablePatches();
 
 export interface Transaction {
   patches: Record<string, Patch>;
@@ -33,9 +32,13 @@ export class UndoRedoSystem<ConsumerState extends Objectish = Objectish> {
   private undoStack: Transaction[];
   private redoStack: Transaction[];
 
-  constructor() {
+  constructor(config?: { mapSet?: boolean }) {
     this.undoStack = [];
     this.redoStack = [];
+    enablePatches();
+    if (config?.mapSet) {
+      enableMapSet();
+    }
   }
 
   canUndo() {
