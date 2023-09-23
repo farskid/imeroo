@@ -8,7 +8,7 @@ on:
 jobs:
   release:
     name: Release
-    if: github.repository == 'Andarist/react-textarea-autosize'
+    if: github.repository == 'farskid/immeroo'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
