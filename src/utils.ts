@@ -1,7 +1,6 @@
 import { Patch } from "immer";
-import { nanoid } from "nanoid";
 
-export const uniqueTransactionId = () => nanoid();
+export const uniqueTransactionId = () => Math.random().toString(8);
 
 export const getPatchPath = (patch: Patch) => patch.path.join(".");
 

@@ -45,23 +45,20 @@ class Input {
     this.undoRedoSystem = new UndoRedoSystem<{ value: string }>();
   }
 
-  change(value: string, append?: boolean) {
+  change(value: string, transactionId?: string) {
     let nextState: { value: string };
-    if (append) {
-      nextState = this.undoRedoSystem.append(this.state, (draft) => {
-        draft.value += value;
-      });
-    } else {
-      nextState = this.undoRedoSystem.update(this.state, (draft) => {
-        draft.value = value;
-      });
-    }
+    nextState = this.undoRedoSystem.update(
+      this.state,
+      (draft, { isNewEntry }) => {
+        if (isNewEntry) {
+          draft.value = value;
+        } else {
+          draft.value += value;
+        }
+      },
+      transactionId
+    );
 
-    // console.log(this.state.value);
-    // this.undoRedoSystem.undoStack.forEach((trans) => {
-    //   trans.patches.forEach((p) => console.log("patch", p));
-    //   trans.inversePatches.forEach((p) => console.log("inverse", p));
-    // });
     this.state = nextState;
   }
 
@@ -88,16 +85,14 @@ class App {
     }>();
   }
 
-  set(key: "count" | "double", value: number, append = false) {
-    if (append) {
-      this.state = this.undoRedoSystem.append(this.state, (draft) => {
+  set(key: "count" | "double", value: number, transactionId?: string) {
+    this.state = this.undoRedoSystem.update(
+      this.state,
+      (draft) => {
         draft[key] = value;
-      });
-    } else {
-      this.state = this.undoRedoSystem.update(this.state, (draft) => {
-        draft[key] = value;
-      });
-    }
+      },
+      transactionId
+    );
   }
 
   undo() {
@@ -123,26 +118,33 @@ const initialCanvasState: CanvasState = {
 let canvas: CanvasState = initialCanvasState;
 const canvasUndoRedo = new UndoRedoSystem<CanvasState>();
 
-const reparentShape = (shapeId: string, parentId: string, append = false) => {
-  const method = append ? canvasUndoRedo.append : canvasUndoRedo.update;
+const reparentShape = (
+  shapeId: string,
+  parentId: string,
+  transactionId?: string
+) => {
   // Commit state update to undoRedo system
-  canvas = method.bind(canvasUndoRedo)(canvas, (draftCanvas) => {
-    draftCanvas.relations = produce(canvas.relations, (draft) => {
-      // add it to the new parent
-      if (!draft[parentId]) {
-        draft[parentId] = [];
-      }
-      draft[parentId].push(shapeId);
-
-      // remove it from existing parent
-      for (const id in draft) {
-        if (id !== parentId && draft[id].includes(shapeId)) {
-          const index = draft[id].indexOf(shapeId);
-          draft[id].splice(index, 1);
+  canvas = canvasUndoRedo.update(
+    canvas,
+    (draftCanvas) => {
+      draftCanvas.relations = produce(canvas.relations, (draft) => {
+        // add it to the new parent
+        if (!draft[parentId]) {
+          draft[parentId] = [];
         }
-      }
-    });
-  });
+        draft[parentId].push(shapeId);
+
+        // remove it from existing parent
+        for (const id in draft) {
+          if (id !== parentId && draft[id].includes(shapeId)) {
+            const index = draft[id].indexOf(shapeId);
+            draft[id].splice(index, 1);
+          }
+        }
+      });
+    },
+    transactionId
+  );
 };
 
 const undoCanvas = () => {
@@ -154,6 +156,40 @@ const redoCanvas = () => {
 // /Non-class consumer
 
 describe("Spec", () => {
+  it("canUndo", () => {
+    let state = { num: 0 };
+    const undoRedo = new UndoRedoSystem<typeof state>();
+    expect(undoRedo.canUndo()).toBe(false);
+    state = undoRedo.update(state, (d) => {
+      d.num = 1;
+    });
+    expect(undoRedo.canUndo()).toBe(true);
+    state = undoRedo.redo(state);
+    expect(undoRedo.canUndo()).toBe(true);
+    state = undoRedo.undo(state);
+    expect(undoRedo.canUndo()).toBe(false);
+    state = undoRedo.undo(state);
+    expect(undoRedo.canUndo()).toBe(false);
+  });
+  it("canRedo", () => {
+    let state = { num: 0 };
+    const undoRedo = new UndoRedoSystem<typeof state>();
+    expect(undoRedo.canRedo()).toBe(false);
+    state = undoRedo.update(state, (d) => {
+      d.num = 1;
+    });
+    expect(undoRedo.canRedo()).toBe(false);
+    state = undoRedo.undo(state);
+    expect(undoRedo.canRedo()).toBe(true);
+    state = undoRedo.redo(state);
+    expect(undoRedo.canRedo()).toBe(false);
+    state = undoRedo.undo(state);
+    expect(undoRedo.canRedo()).toBe(true);
+    state = undoRedo.update(state, (d) => {
+      d.num = 2;
+    });
+    expect(undoRedo.canRedo()).toBe(false);
+  });
   it("Undo and redo should work", () => {
     const counter = new Counter(0);
     counter.increment();
@@ -175,9 +211,11 @@ describe("Appending", () => {
 
     input.change("a");
 
+    const id = "abcd";
+
     // As if we changed to `bc` at once
-    input.change("b");
-    input.change("c", true);
+    input.change("b", id);
+    input.change("c", id);
 
     expect(input.state.value).toBe("bc");
 
@@ -195,9 +233,10 @@ describe("Appending", () => {
 
     app.set("count", 2);
 
+    const id = "1234";
     // Merged into one update
-    app.set("double", 6);
-    app.set("count", 4, true);
+    app.set("double", 6, id);
+    app.set("count", 4, id);
     // As if we did app.set(['count', 'double'], [4, 6])
 
     // 2 0
@@ -247,7 +286,9 @@ describe("Appending", () => {
     }
   `);
 
-    reparentShape("circle", "rect");
+    const id = "abcd";
+
+    reparentShape("circle", "rect", id);
 
     expect(canvas).toMatchInlineSnapshot(`
     {
@@ -269,7 +310,7 @@ describe("Appending", () => {
     }
   `);
 
-    reparentShape("rect", "star", true);
+    reparentShape("rect", "star", id);
 
     expect(canvas).toMatchInlineSnapshot(`
     {
@@ -341,17 +382,94 @@ describe("Appending", () => {
   });
 });
 
-// describe("Batching", () => {
-//   const reparentShapeAsync = (shapeId: string, parentId: string) => {
-//     const randomDelay = Math.floor(Math.random() * 2000);
-//     return new Promise((resolve) => {
-//       setTimeout(() => {
-//         reparentShape(shapeId, parentId);
-//         resolve(undefined);
-//       }, randomDelay);
-//     });
-//   };
+describe("Batching", () => {
+  it("Should batch concurrent updates into a single update", async () => {
+    // Reset canvas from prev tests
+    canvas = initialCanvasState;
 
-//   const batchId = canvasUndoRedo.openBatch();
+    const id = "abcd";
+    const reparentShapeAsync = (shapeId: string, parentId: string) => {
+      const randomDelay = Math.floor(Math.random() * 2000);
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          reparentShape(shapeId, parentId, id);
+          resolve(undefined);
+        }, randomDelay);
+      });
+    };
 
-// });
+    await Promise.all([
+      reparentShapeAsync("circle", "rect"),
+      reparentShapeAsync("rect", "star"),
+      reparentShapeAsync("star", "circle"),
+    ]);
+
+    expect(canvas).toMatchInlineSnapshot(`
+      {
+        "relations": {
+          "circle": [
+            "star",
+          ],
+          "rect": [
+            "circle",
+          ],
+          "root": [],
+          "star": [
+            "rect",
+          ],
+        },
+        "shapes": [
+          "root",
+          "circle",
+          "rect",
+          "star",
+        ],
+      }
+    `);
+
+    undoCanvas();
+
+    expect(canvas).toMatchInlineSnapshot(`
+      {
+        "relations": {
+          "root": [
+            "circle",
+            "rect",
+            "star",
+          ],
+        },
+        "shapes": [
+          "root",
+          "circle",
+          "rect",
+          "star",
+        ],
+      }
+    `);
+
+    redoCanvas();
+
+    expect(canvas).toMatchInlineSnapshot(`
+      {
+        "relations": {
+          "circle": [
+            "star",
+          ],
+          "rect": [
+            "circle",
+          ],
+          "root": [],
+          "star": [
+            "rect",
+          ],
+        },
+        "shapes": [
+          "root",
+          "circle",
+          "rect",
+          "star",
+        ],
+      }
+    `);
+  });
+});

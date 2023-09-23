@@ -6,7 +6,11 @@ import {
   Objectish,
   produce,
 } from "immer";
-import { immerToTransactionPatches, transactionToImmerPatches } from "./utils";
+import {
+  immerToTransactionPatches,
+  transactionToImmerPatches,
+  uniqueTransactionId,
+} from "./utils";
 export type { Patch } from "immer";
 
 enablePatches();
@@ -14,6 +18,7 @@ enablePatches();
 export interface Transaction {
   patches: Record<string, Patch>;
   inversePatches: Record<string, Patch>;
+  transactionId: string;
 }
 
 /**
@@ -33,29 +38,11 @@ export class UndoRedoSystem<ConsumerState extends Objectish = Objectish> {
     this.redoStack = [];
   }
 
-  /**
-   *
-   * @description Commits a new entry to the undo stack
-   * @param recipe A recipe to update consumer state. Mutations are safe inside the recipe.
-   * @returns next state
-   */
-  update(
-    currentState: ConsumerState,
-    recipe: (draft: ConsumerState) => void
-  ): ConsumerState {
-    const [nextState, patches, inversePatches] = produceWithPatches(
-      currentState,
-      recipe
-    );
-
-    this.redoStack.length = 0;
-
-    this.undoStack.push({
-      patches: immerToTransactionPatches(patches),
-      inversePatches: immerToTransactionPatches(inversePatches),
-    });
-
-    return nextState;
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+  canRedo() {
+    return this.redoStack.length > 0;
   }
 
   /**
@@ -64,15 +51,25 @@ export class UndoRedoSystem<ConsumerState extends Objectish = Objectish> {
    * @param recipe A recipe to update consumer state. Mutations are safe inside the recipe.
    * @returns next state
    */
-  append(currentState: ConsumerState, recipe: (draft: ConsumerState) => void) {
+  update(
+    currentState: ConsumerState,
+    recipe: (draft: ConsumerState, options: { isNewEntry: boolean }) => void,
+    transactionId?: string
+  ) {
+    const lastUndoEntry = this.undoStack.at(-1);
+    const isAppending =
+      lastUndoEntry &&
+      transactionId &&
+      lastUndoEntry.transactionId === transactionId;
+
     const [nextState, patches, inversePatches] = produceWithPatches(
       currentState,
-      recipe
+      (draft) => recipe(draft as ConsumerState, { isNewEntry: !isAppending })
     );
 
     this.redoStack.length = 0;
-    const lastUndoEntry = this.undoStack.at(-1);
-    if (lastUndoEntry) {
+
+    if (isAppending) {
       // Update to a path that already exists in prev transaction just replaces that update
       // Any update path that didn't exist in the prev transaction will be added to it
 
@@ -93,7 +90,11 @@ export class UndoRedoSystem<ConsumerState extends Objectish = Objectish> {
         }
       );
     } else {
-      this.update(currentState, recipe);
+      this.undoStack.push({
+        patches: immerToTransactionPatches(patches),
+        inversePatches: immerToTransactionPatches(inversePatches),
+        transactionId: transactionId ?? uniqueTransactionId(),
+      });
     }
 
     return nextState;
