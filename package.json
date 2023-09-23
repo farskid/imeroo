@@ -14,8 +14,8 @@
     "url": "https://farzadyz.com"
   },
   "version": "0.0.1",
-  "main": "dist/imeroo.cjs.js",
-  "module": "dist/imeroo.esm.js",
+  "main": "dist/immeroo.cjs.js",
+  "module": "dist/immeroo.esm.js",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
