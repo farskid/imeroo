@@ -1,6 +1,13 @@
 {
-  "name": "imeroo",
-  "description": "Undo/redo for TypeScript applications",
+  "name": "immeroo",
+  "description": "Undo redo for TypeScript applications",
+  "keywords": [
+    "undo",
+    "redo",
+    "command pattern",
+    "immer",
+    "transaction"
+  ],
   "author": {
     "name": "Farzad Yousefzadeh",
     "email": "farskid@gmail.com",
@@ -10,6 +17,9 @@
   "main": "dist/imeroo.cjs.js",
   "module": "dist/imeroo.esm.js",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@babel/core": "^7.22.20",
     "@babel/parser": "^7.22.16",
@@ -19,17 +29,19 @@
     "@types/jest": "^29.5.5",
     "@types/node": "^20.6.3",
     "typescript": "^5.2.2",
-    "vitest": "^0.34.5"
+    "vitest": "^0.34.5",
+    "@changesets/cli": "^2.26.2"
   },
   "scripts": {
     "dev": "preconstruct watch",
     "postinstall": "preconstruct dev",
     "build": "preconstruct build",
-    "prepublish": "yarn build",
-    "release": "yarn publish:packages"
+    "prepare": "npm run build",
+    "prerelease": "npm test",
+    "release": "yarn changeset version && yarn changeset publish",
+    "test": "yarn vitest run"
   },
   "dependencies": {
-    "changeset": "^0.2.6",
     "immer": "^10.0.2",
     "nanoid": "^5.0.1"
   }
